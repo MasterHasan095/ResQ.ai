@@ -4,9 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import analyze, incidents, stats
 
 
+
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="AI Fall Detector Backend",
+        title="AI First Responder API",
         version="0.1.0",
         description="Backend for the AI Fall Detector / First Responder system."
     )
@@ -28,3 +29,8 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
