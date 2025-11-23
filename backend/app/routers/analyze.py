@@ -12,14 +12,15 @@ from fastapi import (
     Depends,
     status,
 )
-from sqlalchemy.orm import Session
 
 from app.schemas.analyze_schema import AnalyzeResponse
 from app.core.pose_inference import run_pose_inference
 from app.core.fall_logic import FallDetector
-from app.database.db import get_db
-from app.database.incident_model import Incident
-from app.notifications.sms import send_fall_alert_sms  # 👈 import your SMS helper
+from app.notifications.sms import send_fall_alert_sms  # Twilio helper
+
+# 👇 Replace this import with whatever you actually use to get your Mongo collection
+# Example if you're using Motor:
+#   from app.database.mongo import get_incidents_collection
 
 router = APIRouter(
     prefix="/analyze",
@@ -38,8 +39,15 @@ def ping():
 async def analyze_frame(
     file: UploadFile = File(...),
     device_id: Optional[str] = None,
-    db: Session = Depends(get_db),
+    # incidents_collection=Depends(get_incidents_collection),
 ):
+    """
+    Analyze a single image frame:
+    - Run pose inference
+    - Run fall detection
+    - If fall detected: log incident to Mongo + send SMS
+    """
+
     # 1) Validate file type
     if file.content_type not in ("image/jpeg", "image/png"):
         raise HTTPException(
@@ -58,7 +66,7 @@ async def analyze_frame(
             detail="Could not decode image",
         )
 
-    # 3) Run pose inference (Priyanshu's function)
+    # 3) Run pose inference
     keypoints_list = run_pose_inference(frame_bgr)  # list[np.ndarray]
     first_person = keypoints_list[0] if keypoints_list else None
 
@@ -79,22 +87,26 @@ async def analyze_frame(
     else:
         severity = "low"
 
-    # 6) Log incident in DB ONLY if a fall is detected
+    # 6) Log incident in MongoDB ONLY if a fall is detected
     if fall_flag:
-        incident = Incident(
-            fall_detected=fall_flag,
-            confidence=confidence,
-            severity=severity,
-            device_id=device_id,
-        )
-        db.add(incident)
-        db.commit()
-        db.refresh(incident)
+        incident_doc = {
+            "fall_detected": fall_flag,
+            "confidence": confidence,
+            "severity": severity,
+            "device_id": device_id,
+            # you can add timestamp here or let Mongo do it
+        }
+
+        # Assuming incidents_collection is a Motor async collection
+        # e.g. AsyncIOMotorCollection from motor.motor_asyncio
+        try:
+            await incidents_collection.insert_one(incident_doc)
+        except Exception as e:
+            print(f"❌ Error inserting incident into MongoDB: {e}")
 
         # 7) 🔔 Send real SMS alert using Twilio
-        # For now, hard-code one emergency contact for demo:
         EMERGENCY_PHONE = "+19055987068"   # 👈 put your verified phone number here
-        PATIENT_NAME = "Yashika"      # 👈 or "Ishan", or get from DB later
+        PATIENT_NAME = "Yashika"           # 👈 or load from DB later
 
         try:
             send_fall_alert_sms(

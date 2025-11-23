@@ -24,7 +24,7 @@ def get_twilio_client() -> Client:
     return _twilio_client
 
 
-def send_fall_alert_sms(to_phone: str, patient_name: str, severity: str, confidence: float):
+def send_fall_alert_sms(to_phone: str, patient_name: str, confidence: float):
     """
     Sends a real SMS using Twilio.
     'to_phone' must be in E.164 format, e.g. '+14165551234'
@@ -33,10 +33,9 @@ def send_fall_alert_sms(to_phone: str, patient_name: str, severity: str, confide
         print(" Twilio config missing, not sending SMS.")
         return
 
-    severity = severity.upper()
     msg = (
         f"🚨 Fall detected for {patient_name}.\n"
-        f"Severity: {severity}, confidence: {confidence:.2f}.\n"
+        f"Confidence: {confidence:.2f}.\n"
         f"Please check on them immediately."
     )
 

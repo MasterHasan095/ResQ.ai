@@ -1,19 +1,19 @@
 # backend/app/database/incident_model.py
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, Float, Boolean, String, DateTime
+from pydantic import BaseModel, Field
 
-from .db import Base
+class IncidentCreate(BaseModel):
+    fall_detected: bool
+    confidence: float
+    severity: str | None = None
+    device_id: str | None = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-
-class Incident(Base):
-    __tablename__ = "incidents"
-
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
-
-    fall_detected = Column(Boolean, default=False, index=True)
-    confidence = Column(Float, nullable=False)
-
-    severity = Column(String, nullable=True)
-    device_id = Column(String, nullable=True)
+class IncidentRead(BaseModel):
+    id: str
+    fall_detected: bool
+    confidence: float
+    severity: str | None
+    device_id: str | None
+    timestamp: datetime
