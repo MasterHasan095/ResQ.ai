@@ -1,15 +1,18 @@
+import os
 from motor.motor_asyncio import AsyncIOMotorClient
-from decouple import config
+from dotenv import load_dotenv
 
-# Load Mongo connection string from .env or environment
-MONGO_URI = config("MONGO_URI")
+load_dotenv()  # load .env
 
-# Create async Mongo client
+MONGO_URI = os.environ["MONGO_URI"]
+MONGO_DB_NAME = os.environ.get("MONGO_DB_NAME", "fall_detector_db")
+
 client = AsyncIOMotorClient(MONGO_URI)
+db = client[MONGO_DB_NAME]
 
-# Choose your database
-db = client["fall_detector_db"]
-
-# Collections
+# ---- Collections (match exactly what Compass shows) ----
 users_collection = db["users"]
-falls_collection = db["fall_events"]
+incident_collection = db["incidents"]
+contacts_collection = db["contacts"]
+devices_collection = db["devices"]
+notifications_collection = db["notifications"]
