@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>ResQ.ai WebSocket Test</h2>
+    <pre id="log"></pre>
+
+    <script>
+      const logEl = document.getElementById("log");
+      const log = (msg) => {
+        logEl.textContent += msg + "\n";
+      };
+
+      const ws = new WebSocket("ws://localhost:8000/ws/falls");
+
+      ws.onopen = () => log("✅ Connected to ws://localhost:8000/ws/falls");
+      ws.onmessage = (event) => log("📩 Message: " + event.data);
+      ws.onerror = (err) => log("❌ Error: " + JSON.stringify(err));
+      ws.onclose = () => log("🔌 Connection closed");
+
+      // Optional: send something so backend's receive_text() returns
+      ws.onopen = () => {
+        log("✅ Connected");
+        ws.send("hello from browser");
+      };
+    </script>
+  </body>
+</html>
