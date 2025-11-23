@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import analyze, incidents, stats
+from app.routers import analyze, incidents, stats, test_db
 
 
 
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(analyze.router, prefix="/analyze", tags=["Analyze"])
     app.include_router(incidents.router, prefix="/incidents", tags=["Incidents"])
     app.include_router(stats.router, prefix="/stats", tags=["Stats"])
+    app.include_router(test_db.router)
 
     return app
 
