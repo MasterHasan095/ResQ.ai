@@ -1,24 +1,15 @@
-# backend/app/database/db.py
+from motor.motor_asyncio import AsyncIOMotorClient
+from decouple import config
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+# Load Mongo connection string from .env or environment
+MONGO_URI = config("MONGO_URI")
 
-DATABASE_URL = "sqlite:///./incidents.db"  # file in backend root
+# Create async Mongo client
+client = AsyncIOMotorClient(MONGO_URI)
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},  # needed for SQLite + FastAPI
-)
+# Choose your database
+db = client["fall_detector_db"]
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-
-def get_db():
-    """Dependency to get a DB session in your routes."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# Collections
+users_collection = db["users"]
+falls_collection = db["fall_events"]

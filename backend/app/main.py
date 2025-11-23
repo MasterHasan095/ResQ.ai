@@ -1,31 +1,36 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database.db import Base, engine
-from app.routers import analyze, incidents, stats
+from app.routers import analyze, incidents, stats, test_db
 
-# Create tables
-Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="Fall Detection API",
-    version="1.0.0",
-)
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="AI First Responder API",
+        version="0.1.0",
+        description="Backend for the AI Fall Detector / First Responder system."
+    )
 
-# CORS so Flutter can call it
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],      # later you can restrict
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # CORS for Flutter and local testing
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],   # TODO: Restrict in production
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# Register routers
-app.include_router(analyze.router)
-app.include_router(incidents.router)
-app.include_router(stats.router)
+    # Routers
+    app.include_router(analyze.router, prefix="/analyze", tags=["Analyze"])
+    app.include_router(incidents.router, prefix="/incidents", tags=["Incidents"])
+    app.include_router(stats.router, prefix="/stats", tags=["Stats"])
+    app.include_router(test_db.router, prefix="/test", tags=["Test"])
 
-@app.get("/")
-def root():
-    return {"message": "Fall Detection Backend is running 🚀"}
+    return app
+
+
+app = create_app()
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

@@ -9,22 +9,16 @@ from fastapi import (
     UploadFile,
     File,
     HTTPException,
-    Depends,
     status,
 )
-from sqlalchemy.orm import Session
 
 from app.schemas.analyze_schema import AnalyzeResponse
 from app.core.pose_inference import run_pose_inference
 from app.core.fall_logic import FallDetector
-from app.database.db import get_db
-from app.database.incident_model import Incident
+from app.database.incident_logger import log_incident
 
-# All endpoints in this router will start with /analyze
-router = APIRouter(
-    prefix="/analyze",
-    tags=["analyze"],
-)
+# This router gets prefixed in main.py: prefix="/analyze"
+router = APIRouter()
 
 fall_detector = FallDetector()
 
@@ -39,7 +33,6 @@ def ping():
 async def analyze_frame(
     file: UploadFile = File(...),
     device_id: Optional[str] = None,          # Flutter can send ?device_id=phone123
-    db: Session = Depends(get_db),
 ):
     # 1) Validate file type
     if file.content_type not in ("image/jpeg", "image/png"):
@@ -80,17 +73,16 @@ async def analyze_frame(
     else:
         severity = "low"
 
-    # 6) Log incident in DB ONLY if a fall is detected
+    # 6) Log incident in MongoDB ONLY if a fall is detected
     if fall_flag:
-        incident = Incident(
-            fall_detected=fall_flag,
-            confidence=confidence,
-            severity=severity,
-            device_id=device_id,
+        log_incident(
+            {
+                "device_id": device_id,
+                "fall_detected": fall_flag,
+                "confidence": confidence,
+                "severity": severity,
+            }
         )
-        db.add(incident)
-        db.commit()
-        db.refresh(incident)
 
     # 7) Return clean JSON for Flutter
     return AnalyzeResponse(
