@@ -32,7 +32,7 @@ async def handle_fall_event(result, keypoints, metadata=None):
 
     # TODO: Twilio SMS
     EMERGENCY_PHONE = "+19055987068"  # 👈 put your verified phone number here
-    PATIENT_NAME = "Yashika"  # 👈 or load from DB later
+    PATIENT_NAME = "Jake"  # 👈 or load from DB later
 
     try:
         send_fall_alert_sms(
