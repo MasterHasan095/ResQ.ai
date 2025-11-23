@@ -2,55 +2,69 @@ import cv2
 import numpy as np
 from app.core.pose_inference import run_pose_inference
 from app.core.fall_logic import FallDetector
+from app.core.alerts import handle_fall_event   # NEW
 
-# Initialize fall detector with tunable sensitivity
 fall_detector = FallDetector(
     max_history=15,
-    drop_threshold_norm=0.30,   # try 0.25–0.35
-    gap_threshold_norm=0.22     # try 0.18–0.25
+    drop_threshold_norm=0.30,
+    gap_threshold_norm=0.22
 )
 
 def main():
-    # -----------------------------------------------
-    # SELECT INPUT MODE
-    # -----------------------------------------------
-    USE_WEBCAM = True   # ▶️ change to True for webcam mode
+
+    USE_WEBCAM = True
 
     if USE_WEBCAM:
         print("Using webcam...")
+        source_label = "webcam_0"
         cap = cv2.VideoCapture(0)
     else:
         video_path = "videos/testvideo4.mp4"
-        print(f"Using video file: {video_path}")
+        print(f"Using video: {video_path}")
+        source_label = video_path
         cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
-        print("Failed to open source!")
+        print("Failed to open video/camera")
         return
 
-    print("Processing... Press ESC or Q to stop.\n")
+    print("Processing... Press ESC or Q to exit.\n")
+
+    prev_fall = False   # Track fall change
+    frame_idx = 0
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("No frame received (video ended or camera error).")
+            print("Video ended or camera error")
             break
 
-        # Run pose inference
+        frame_idx += 1
+
         poses = run_pose_inference(frame)
 
         if len(poses) == 0:
-            print("No pose detected")
+            prev_fall = False  # Reset if no person
         else:
             keypoints = poses[0]
 
-            print("Keypoints shape:", keypoints.shape)
-
-            # Fall detection
             result = fall_detector.update(keypoints)
-            print("Result:", result)
 
-            # Draw result on frame
+            # 🔥 FIRE EVENT ONLY ON TRUE -> (previous FALSE)
+            if result["fall"] and not prev_fall:
+                handle_fall_event(
+                    result,
+                    keypoints,
+                    metadata={
+                        "frame_idx": frame_idx,
+                        "source": source_label,
+                        "resolution": (frame.shape[1], frame.shape[0])
+                    }
+                )
+
+            prev_fall = result["fall"]
+
+            # Draw text
             text = f"Fall: {result['fall']} | Conf: {result['confidence']:.2f}"
             cv2.putText(
                 frame,
@@ -68,12 +82,8 @@ def main():
 
         cv2.imshow("YOLO Pose + Fall Detection", frame)
 
-        # -------------------------------
-        # EXIT CONDITIONS (ESC OR Q KEY)
-        # -------------------------------
         key = cv2.waitKey(1) & 0xFF
-        if key == 27 or key == ord('q'):     # 27 = ESC, 'q' = quit
-            print("Exit key pressed. Stopping...")
+        if key == 27 or key == ord('q'):
             break
 
     cap.release()
