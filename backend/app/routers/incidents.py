@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from bson import ObjectId
 
 from app.database.db import incident_collection
-from app.schemas.incident_schema import IncidentRead
+from app.schemas.incident import IncidentRead
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 

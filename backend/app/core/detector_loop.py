@@ -1,3 +1,4 @@
+# app/core/detector_loop.py
 import asyncio
 import cv2
 import numpy as np
@@ -14,7 +15,15 @@ fall_detector = FallDetector(
 )
 
 
-async def main():
+async def detection_loop():
+    """
+    Long-running async task that:
+    - reads frames from webcam/video
+    - runs pose inference
+    - updates fall detector
+    - on a new fall, calls handle_fall_event(...)
+    """
+
     USE_WEBCAM = True
 
     if USE_WEBCAM:
@@ -31,7 +40,7 @@ async def main():
         print("Failed to open video/camera")
         return
 
-    print("Processing... Press ESC or Q to exit.\n")
+    print("Processing... (server mode)\n")
 
     prev_fall = False   # Track fall change
     frame_idx = 0
@@ -67,7 +76,7 @@ async def main():
 
             prev_fall = result["fall"]
 
-            # Draw text
+            # Optional: overlay (for debugging if you have a screen)
             text = f"Fall: {result['fall']} | Conf: {result['confidence']:.2f}"
             cv2.putText(
                 frame,
@@ -79,19 +88,17 @@ async def main():
                 2,
             )
 
-            # Draw keypoints
             for (x, y) in keypoints:
                 cv2.circle(frame, (int(x), int(y)), 4, (255, 0, 0), -1)
 
+        # You *can* keep this if you want a debug window while server runs
         cv2.imshow("YOLO Pose + Fall Detection", frame)
-
         key = cv2.waitKey(1) & 0xFF
         if key == 27 or key == ord("q"):
             break
 
+        # Yield to event loop so FastAPI doesn't starve
+        await asyncio.sleep(0)
+
     cap.release()
     cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
