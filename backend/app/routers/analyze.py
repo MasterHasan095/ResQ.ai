@@ -9,31 +9,45 @@ from fastapi import (
     UploadFile,
     File,
     HTTPException,
+    Depends,
     status,
 )
 
 from app.schemas.analyze_schema import AnalyzeResponse
 from app.core.pose_inference import run_pose_inference
 from app.core.fall_logic import FallDetector
-from app.database.incident_logger import log_incident
+from app.notifications.sms import send_fall_alert_sms  # Twilio helper
 
-# This router gets prefixed in main.py: prefix="/analyze"
-router = APIRouter()
+# 👇 Replace this import with whatever you actually use to get your Mongo collection
+# Example if you're using Motor:
+#   from app.database.mongo import get_incidents_collection
+
+router = APIRouter(
+    prefix="/analyze",
+    tags=["analyze"],
+)
 
 fall_detector = FallDetector()
 
 
 @router.get("/ping")
 def ping():
-    # GET /analyze/ping → quick health check for this router
     return {"analyze": "ok"}
 
 
 @router.post("/frame", response_model=AnalyzeResponse)
 async def analyze_frame(
     file: UploadFile = File(...),
-    device_id: Optional[str] = None,          # Flutter can send ?device_id=phone123
+    device_id: Optional[str] = None,
+    # incidents_collection=Depends(get_incidents_collection),
 ):
+    """
+    Analyze a single image frame:
+    - Run pose inference
+    - Run fall detection
+    - If fall detected: log incident to Mongo + send SMS
+    """
+
     # 1) Validate file type
     if file.content_type not in ("image/jpeg", "image/png"):
         raise HTTPException(
@@ -52,11 +66,11 @@ async def analyze_frame(
             detail="Could not decode image",
         )
 
-    # 3) Run pose inference (Priyanshu's function)
+    # 3) Run pose inference
     keypoints_list = run_pose_inference(frame_bgr)  # list[np.ndarray]
     first_person = keypoints_list[0] if keypoints_list else None
 
-    # 4) Run fall detection (Priyanshu's logic)
+    # 4) Run fall detection
     if first_person is None:
         fall_flag = False
         confidence = 0.0
@@ -65,7 +79,7 @@ async def analyze_frame(
         fall_flag = bool(result.get("fall", False))
         confidence = float(result.get("confidence", 0.0))
 
-    # 5) Simple severity rule based on confidence
+    # 5) Severity based on confidence
     if confidence >= 0.8:
         severity = "high"
     elif confidence >= 0.5:
@@ -75,16 +89,37 @@ async def analyze_frame(
 
     # 6) Log incident in MongoDB ONLY if a fall is detected
     if fall_flag:
-        log_incident(
-            {
-                "device_id": device_id,
-                "fall_detected": fall_flag,
-                "confidence": confidence,
-                "severity": severity,
-            }
-        )
+        incident_doc = {
+            "fall_detected": fall_flag,
+            "confidence": confidence,
+            "severity": severity,
+            "device_id": device_id,
+            # you can add timestamp here or let Mongo do it
+        }
 
-    # 7) Return clean JSON for Flutter
+        # Assuming incidents_collection is a Motor async collection
+        # e.g. AsyncIOMotorCollection from motor.motor_asyncio
+        try:
+            await incidents_collection.insert_one(incident_doc)
+        except Exception as e:
+            print(f"❌ Error inserting incident into MongoDB: {e}")
+
+        # 7) 🔔 Send real SMS alert using Twilio
+        EMERGENCY_PHONE = "+19055987068"   # 👈 put your verified phone number here
+        PATIENT_NAME = "Yashika"           # 👈 or load from DB later
+
+        try:
+            send_fall_alert_sms(
+                to_phone=EMERGENCY_PHONE,
+                patient_name=PATIENT_NAME,
+                severity=severity,
+                confidence=confidence,
+            )
+        except Exception as e:
+            # don't crash the API if SMS fails, just log it
+            print(f"❌ Error sending SMS: {e}")
+
+    # 8) Return clean JSON for Flutter / testing
     return AnalyzeResponse(
         fall_detected=fall_flag,
         confidence=confidence,

@@ -4,6 +4,7 @@ import numpy as np
 import asyncio
 
 from app.core.websocket_manager import manager  # ⬅ NEW
+from app.notifications.sms import send_fall_alert_sms  # Twilio helper
 
 
 def serialize_keypoints(keypoints):
@@ -30,6 +31,19 @@ async def handle_fall_event(result, keypoints, metadata=None):
     }
 
     # TODO: Twilio SMS
+    EMERGENCY_PHONE = "+19055987068"  # 👈 put your verified phone number here
+    PATIENT_NAME = "Yashika"  # 👈 or load from DB later
+
+    try:
+        send_fall_alert_sms(
+            to_phone=EMERGENCY_PHONE,
+            patient_name=PATIENT_NAME,
+            confidence=float(result.get("confidence", 0.0)),
+        )
+    except Exception as e:
+        # don't crash the API if SMS fails, just log it
+        print(f"❌ Error sending SMS: {e}")
+
     # await send_fall_sms(event)  # make that async later
 
     # 🔌 WebSocket push
