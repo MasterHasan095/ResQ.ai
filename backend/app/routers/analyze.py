@@ -7,6 +7,9 @@ import numpy as np
 from app.core.pose_inference import run_pose_inference
 from app.core.fall_logic import FallDetector
 
+from app.database.incident_logger import log_incident
+
+
 router = APIRouter()
 fall_detector = FallDetector()
 
@@ -38,6 +41,9 @@ async def analyze_frame(file: UploadFile = File(...)):
         "fall": False,
         "confidence": 0.0,
     }
+
+    if result.get("fall"):
+        log_incident(result)
 
     return AnalyzeResponse(
         fall_detected=bool(result.get("fall", False)),
